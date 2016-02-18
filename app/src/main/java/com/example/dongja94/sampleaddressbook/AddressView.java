@@ -30,4 +30,38 @@ public class AddressView extends FrameLayout {
         homeView.setText(data.home);
         officeView.setText(data.office);
     }
+
+    private void makeAddressData() {
+        if (data == null) {
+            data = new AddressData();
+        }
+    }
+
+    public void setName(String name) {
+        makeAddressData();
+        data.name = name;
+        nameView.setText(name);
+    }
+
+    public void setPhone(String phone) {
+        makeAddressData();
+        data.phone = phone;
+        phoneView.setText(phone);
+
+    }
+
+    public void setHome(String home) {
+        makeAddressData();
+        data.home = home;
+        homeView.setText(home);
+
+    }
+
+    public void setOffice(String office) {
+        makeAddressData();
+        data.office = office;
+        officeView.setText(office);
+    }
+
+
 }

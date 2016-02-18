@@ -16,7 +16,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -24,6 +23,7 @@ public class MainActivity extends AppCompatActivity {
     ListView listView;
     AddressAdapter mAdapter;
     SimpleCursorAdapter mCursorAdapter;
+    AddressCursorAdapter mAddressCursorAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,9 +45,9 @@ public class MainActivity extends AppCompatActivity {
         listView = (ListView)findViewById(R.id.listView);
         mAdapter = new AddressAdapter();
 
-        String[] from = {DBContant.AddressBook.COLUMN_NAME, DBContant.AddressBook.COLUMN_PHONE,
-                DBContant.AddressBook.COLUMN_HOME, DBContant.AddressBook.COLUMN_OFFICE};
-        int[] to = {R.id.text_name, R.id.text_phone, R.id.text_home, R.id.text_office};
+        String[] from = {DBContants.AddressBook.COLUMN_NAME, DBContants.AddressBook.COLUMN_PHONE,
+                DBContants.AddressBook.COLUMN_HOME, DBContants.AddressBook.COLUMN_OFFICE, DBContants.MessageTable.COLUMN_MESSAGE};
+        int[] to = {R.id.text_name, R.id.text_phone, R.id.text_home, R.id.text_office, R.id.text_message};
 
         mCursorAdapter = new SimpleCursorAdapter(this, R.layout.view_address, null, from , to, 0);
 //        listView.setAdapter(mAdapter);
@@ -70,16 +70,23 @@ public class MainActivity extends AppCompatActivity {
                 return false;
             }
         });
-
         listView.setAdapter(mCursorAdapter);
+
+        mAddressCursorAdapter = new AddressCursorAdapter(this);
+//        listView.setAdapter(mAddressCursorAdapter);
 
 
         listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
             public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
                 Cursor c = (Cursor)listView.getItemAtPosition(position);
-                String name = c.getString(c.getColumnIndex(DBContant.AddressBook.COLUMN_NAME));
-                Toast.makeText(MainActivity.this, "name : " + name , Toast.LENGTH_SHORT).show();
+                long addressid = c.getLong(c.getColumnIndex(DBContants.AddressBook._ID));
+                String name = c.getString(c.getColumnIndex(DBContants.AddressBook.COLUMN_NAME));
+                Intent intent = new Intent(MainActivity.this, MessageActivity.class);
+                intent.putExtra(MessageActivity.EXTRA_ADDRESS_ID, addressid);
+                intent.putExtra(MessageActivity.EXTRA_ADDRESS_NAME, name);
+                startActivity(intent);
+//                Toast.makeText(MainActivity.this, "name : " + name , Toast.LENGTH_SHORT).show();
             }
         });
 
@@ -107,13 +114,15 @@ public class MainActivity extends AppCompatActivity {
 //        mAdapter.addAll(list);
         Cursor c = DataManager.getInstance().getAddressCursor(mKeyword);
         mCursorAdapter.changeCursor(c);
-        phoneIndex = c.getColumnIndex(DBContant.AddressBook.COLUMN_PHONE);
+//        mAddressCursorAdapter.changeCursor(c);
+        phoneIndex = c.getColumnIndex(DBContants.AddressBook.COLUMN_PHONE);
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
         mCursorAdapter.changeCursor(null);
+//        mAddressCursorAdapter.changeCursor(null);
     }
 
     @Override

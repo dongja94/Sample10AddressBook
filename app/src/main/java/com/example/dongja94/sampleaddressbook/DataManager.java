@@ -7,6 +7,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 import android.text.TextUtils;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.List;
 
 /**
@@ -21,7 +22,7 @@ public class DataManager extends SQLiteOpenHelper {
         return instance;
     }
     private static final String DB_NAME = "addressbook";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2;
 
     private DataManager() {
         super(MyApplication.getContext(), DB_NAME, null, DB_VERSION);
@@ -29,49 +30,126 @@ public class DataManager extends SQLiteOpenHelper {
 
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String sql = "CREATE TABLE "+ DBContant.AddressBook.TABLE_NAME+"(" +
-                DBContant.AddressBook._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
-                DBContant.AddressBook.COLUMN_NAME+" TEXT NOT NULL," +
-                DBContant.AddressBook.COLUMN_PHONE+" TEXT," +
-                DBContant.AddressBook.COLUMN_HOME+" TEXT," +
-                DBContant.AddressBook.COLUMN_OFFICE+" TEXT" +
+        String sql = "CREATE TABLE "+ DBContants.AddressBook.TABLE_NAME+"(" +
+                DBContants.AddressBook._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                DBContants.AddressBook.COLUMN_NAME+" TEXT NOT NULL," +
+                DBContants.AddressBook.COLUMN_PHONE+" TEXT," +
+                DBContants.AddressBook.COLUMN_HOME+" TEXT," +
+                DBContants.AddressBook.COLUMN_OFFICE+" TEXT," +
+                DBContants.AddressBook.COLUMN_LAST_MESSAGE_ID + " INTEGER" +
                 ");";
         db.execSQL(sql);
+
+        String messageTable = "CREATE TABLE " + DBContants.MessageTable.TABLE_NAME + "(" +
+                DBContants.MessageTable._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                DBContants.MessageTable.COLUMN_MATE + " INTEGER," +
+                DBContants.MessageTable.COLUMN_MESSAGE + " TEXT," +
+                DBContants.MessageTable.COLUMN_TYPE + " INTEGER," +
+                DBContants.MessageTable.COLUMN_CREATED_DATE + " DATETIME" +
+                ");";
+        db.execSQL(messageTable);
     }
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        if (oldVersion == 1) {
+            String sql = "ALTER TABLE " + DBContants.AddressBook.TABLE_NAME +
+                    " ADD " + DBContants.AddressBook.COLUMN_LAST_MESSAGE_ID + " INTEGER;";
+            db.execSQL(sql);
+            String messageTable = "CREATE TABLE " + DBContants.MessageTable.TABLE_NAME + "(" +
+                    DBContants.MessageTable._ID + " INTEGER PRIMARY KEY AUTOINCREMENT," +
+                    DBContants.MessageTable.COLUMN_MATE + " INTEGER," +
+                    DBContants.MessageTable.COLUMN_MESSAGE + " TEXT," +
+                    DBContants.MessageTable.COLUMN_TYPE + " INTEGER," +
+                    DBContants.MessageTable.COLUMN_CREATED_DATE + " DATETIME" +
+                    ");";
+            db.execSQL(messageTable);
+        }
+    }
 
+    public Cursor getMessageList(long addressId) {
+        String[] columns = {DBContants.MessageTable.TABLE_NAME +"."+DBContants.MessageTable._ID,
+                DBContants.AddressBook.COLUMN_NAME ,
+                DBContants.MessageTable.COLUMN_MESSAGE,
+                DBContants.MessageTable.COLUMN_TYPE,
+                DBContants.MessageTable.COLUMN_CREATED_DATE
+                };
+
+        String tableName = DBContants.MessageTable.TABLE_NAME + " INNER JOIN " + DBContants.AddressBook.TABLE_NAME +
+                " ON " + DBContants.MessageTable.TABLE_NAME + "."+DBContants.MessageTable.COLUMN_MATE +
+                " = " + DBContants.AddressBook.TABLE_NAME + "." + DBContants.AddressBook._ID;
+        // messageTable INNER JOIN addressBook ON messageTable.mate = addressBook._id
+
+        String selection = DBContants.MessageTable.COLUMN_MATE + " = ?";
+        String[] selectionArgs = {"" + addressId};
+        String orderBy = DBContants.MessageTable.COLUMN_CREATED_DATE + " ASC";
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor c = db.query(tableName, columns, selection, selectionArgs, null, null, orderBy);
+        return c;
+    }
+
+    public static final int MESSAGE_TYPE_RECEIVE = 0;
+    public static final int MESSAGE_TYPE_SEND = 1;
+    public static final int MESSAGE_TYPE_DATE = 2;
+
+    public void insertMessage(long addressId, String message, int type) {
+        SQLiteDatabase db = getWritableDatabase();
+
+        try {
+            db.beginTransaction();
+            values.clear();
+            values.put(DBContants.MessageTable.COLUMN_MATE, addressId);
+            values.put(DBContants.MessageTable.COLUMN_MESSAGE, message);
+            values.put(DBContants.MessageTable.COLUMN_TYPE, type);
+            Calendar c = Calendar.getInstance();
+            values.put(DBContants.MessageTable.COLUMN_CREATED_DATE, c.getTimeInMillis());
+            long messageid = db.insert(DBContants.MessageTable.TABLE_NAME, null, values);
+
+            if (type == MESSAGE_TYPE_SEND || type == MESSAGE_TYPE_RECEIVE) {
+                values.clear();
+                values.put(DBContants.AddressBook.COLUMN_LAST_MESSAGE_ID, messageid);
+                String where = DBContants.AddressBook._ID + " = ?";
+                String[] args = {"" + addressId};
+                db.update(DBContants.AddressBook.TABLE_NAME, values, where, args);
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public Cursor getAddressCursor(String keyword) {
         SQLiteDatabase db = getReadableDatabase();
-        String[] columns = {DBContant.AddressBook._ID,
-                DBContant.AddressBook.COLUMN_NAME,
-                DBContant.AddressBook.COLUMN_PHONE,
-                DBContant.AddressBook.COLUMN_HOME,
-                DBContant.AddressBook.COLUMN_OFFICE};
+        String[] columns = {DBContants.AddressBook.TABLE_NAME + "." + DBContants.AddressBook._ID,
+                DBContants.AddressBook.COLUMN_NAME,
+                DBContants.AddressBook.COLUMN_PHONE,
+                DBContants.AddressBook.COLUMN_HOME,
+                DBContants.AddressBook.COLUMN_OFFICE,
+                DBContants.MessageTable.COLUMN_MESSAGE};
+        String tableName = DBContants.AddressBook.TABLE_NAME + " LEFT OUTER JOIN " + DBContants.MessageTable.TABLE_NAME +
+                " ON " + DBContants.AddressBook.TABLE_NAME + "." + DBContants.AddressBook.COLUMN_LAST_MESSAGE_ID +
+                " = " + DBContants.MessageTable.TABLE_NAME + "." + DBContants.MessageTable._ID;
         String selection = null;
         String[] selectionArgs = null;
         if (!TextUtils.isEmpty(keyword)) {
-            selection = DBContant.AddressBook.COLUMN_NAME + " LIKE ? OR "+ DBContant.AddressBook.COLUMN_HOME+" LIKE ?";
+            selection = DBContants.AddressBook.COLUMN_NAME + " LIKE ? OR "+ DBContants.AddressBook.COLUMN_HOME+" LIKE ?";
             selectionArgs = new String[]{"%"+keyword+"%", "%" + keyword + "%"};
         }
         String groupBy = null;
         String having = null;
-        String orderBy = DBContant.AddressBook.COLUMN_NAME+" COLLATE LOCALIZED ASC";
-        Cursor c = db.query(DBContant.AddressBook.TABLE_NAME,columns,selection, selectionArgs, groupBy, having, orderBy);
+        String orderBy = DBContants.AddressBook.COLUMN_NAME+" COLLATE LOCALIZED ASC";
+        Cursor c = db.query(tableName,columns,selection, selectionArgs, groupBy, having, orderBy);
         return c;
     }
 
     public List<AddressData> getAddressList(String keyword) {
         List<AddressData> list = new ArrayList<AddressData>();
         Cursor c = getAddressCursor(keyword);
-        int idIndex = c.getColumnIndex(DBContant.AddressBook._ID);
-        int nameIndex = c.getColumnIndex(DBContant.AddressBook.COLUMN_NAME);
-        int phoneIndex = c.getColumnIndex(DBContant.AddressBook.COLUMN_PHONE);
-        int homeIndex = c.getColumnIndex(DBContant.AddressBook.COLUMN_HOME);
-        int officeIndex = c.getColumnIndex(DBContant.AddressBook.COLUMN_OFFICE);
+        int idIndex = c.getColumnIndex(DBContants.AddressBook._ID);
+        int nameIndex = c.getColumnIndex(DBContants.AddressBook.COLUMN_NAME);
+        int phoneIndex = c.getColumnIndex(DBContants.AddressBook.COLUMN_PHONE);
+        int homeIndex = c.getColumnIndex(DBContants.AddressBook.COLUMN_HOME);
+        int officeIndex = c.getColumnIndex(DBContants.AddressBook.COLUMN_OFFICE);
         while(c.moveToNext()) {
             AddressData data = new AddressData();
             data._id = c.getLong(idIndex);
@@ -90,11 +168,11 @@ public class DataManager extends SQLiteOpenHelper {
         if (data._id == AddressData.INVALID_ID) {
             SQLiteDatabase db = getWritableDatabase();
             values.clear();
-            values.put(DBContant.AddressBook.COLUMN_NAME, data.name);
-            values.put(DBContant.AddressBook.COLUMN_PHONE, data.phone);
-            values.put(DBContant.AddressBook.COLUMN_HOME, data.home);
-            values.put(DBContant.AddressBook.COLUMN_OFFICE, data.office);
-            db.insert(DBContant.AddressBook.TABLE_NAME, null, values);
+            values.put(DBContants.AddressBook.COLUMN_NAME, data.name);
+            values.put(DBContants.AddressBook.COLUMN_PHONE, data.phone);
+            values.put(DBContants.AddressBook.COLUMN_HOME, data.home);
+            values.put(DBContants.AddressBook.COLUMN_OFFICE, data.office);
+            db.insert(DBContants.AddressBook.TABLE_NAME, null, values);
         } else {
             updateAddress(data);
         }
@@ -107,14 +185,14 @@ public class DataManager extends SQLiteOpenHelper {
         }
         SQLiteDatabase db = getWritableDatabase();
         values.clear();
-        values.put(DBContant.AddressBook.COLUMN_NAME, data.name);
-        values.put(DBContant.AddressBook.COLUMN_PHONE, data.phone);
-        values.put(DBContant.AddressBook.COLUMN_HOME, data.home);
-        values.put(DBContant.AddressBook.COLUMN_OFFICE, data.office);
+        values.put(DBContants.AddressBook.COLUMN_NAME, data.name);
+        values.put(DBContants.AddressBook.COLUMN_PHONE, data.phone);
+        values.put(DBContants.AddressBook.COLUMN_HOME, data.home);
+        values.put(DBContants.AddressBook.COLUMN_OFFICE, data.office);
 
-        String where = DBContant.AddressBook._ID  + " = ?";
+        String where = DBContants.AddressBook._ID  + " = ?";
         String[] args = new String[]{""+data._id};
-        db.update(DBContant.AddressBook.TABLE_NAME, values, where,args);
+        db.update(DBContants.AddressBook.TABLE_NAME, values, where,args);
     }
 
     public void deleteAddress(AddressData data) {
@@ -122,8 +200,8 @@ public class DataManager extends SQLiteOpenHelper {
             return;
         }
         SQLiteDatabase db = getWritableDatabase();
-        String where = DBContant.AddressBook._ID + " = ?";
+        String where = DBContants.AddressBook._ID + " = ?";
         String[] args = new String[]{""+data._id};
-        db.delete(DBContant.AddressBook.TABLE_NAME, where, args);
+        db.delete(DBContants.AddressBook.TABLE_NAME, where, args);
     }
 }
