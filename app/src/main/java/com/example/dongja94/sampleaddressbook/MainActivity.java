@@ -1,9 +1,11 @@
 package com.example.dongja94.sampleaddressbook;
 
 import android.content.Intent;
+import android.database.Cursor;
 import android.os.Bundle;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.Snackbar;
+import android.support.v4.widget.SimpleCursorAdapter;
 import android.support.v7.app.AppCompatActivity;
 import android.support.v7.widget.Toolbar;
 import android.view.Menu;
@@ -13,13 +15,12 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
 
-import java.util.List;
-
 public class MainActivity extends AppCompatActivity {
 
     EditText keywordView;
     ListView listView;
     AddressAdapter mAdapter;
+    SimpleCursorAdapter mCursorAdapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -40,7 +41,15 @@ public class MainActivity extends AppCompatActivity {
         keywordView = (EditText)findViewById(R.id.edit_keyword);
         listView = (ListView)findViewById(R.id.listView);
         mAdapter = new AddressAdapter();
-        listView.setAdapter(mAdapter);
+
+        String[] from = {DBContant.AddressBook.COLUMN_NAME, DBContant.AddressBook.COLUMN_PHONE,
+                DBContant.AddressBook.COLUMN_HOME, DBContant.AddressBook.COLUMN_OFFICE};
+        int[] to = {R.id.text_name, R.id.text_phone, R.id.text_home, R.id.text_office};
+
+        mCursorAdapter = new SimpleCursorAdapter(this, R.layout.view_address, null, from , to, 0);
+//        listView.setAdapter(mAdapter);
+
+        listView.setAdapter(mCursorAdapter);
 
         Button btn = (Button)findViewById(R.id.btn_search);
         btn.setOnClickListener(new View.OnClickListener() {
@@ -60,9 +69,17 @@ public class MainActivity extends AppCompatActivity {
 
     String mKeyword = null;
     public void setData() {
-        List<AddressData> list = DataManager.getInstance().getAddressList(mKeyword);
-        mAdapter.clear();
-        mAdapter.addAll(list);
+//        List<AddressData> list = DataManager.getInstance().getAddressList(mKeyword);
+//        mAdapter.clear();
+//        mAdapter.addAll(list);
+        Cursor c = DataManager.getInstance().getAddressCursor(mKeyword);
+        mCursorAdapter.changeCursor(c);
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mCursorAdapter.changeCursor(null);
     }
 
     @Override
