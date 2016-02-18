@@ -11,9 +11,12 @@ import android.support.v7.widget.Toolbar;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -49,7 +52,36 @@ public class MainActivity extends AppCompatActivity {
         mCursorAdapter = new SimpleCursorAdapter(this, R.layout.view_address, null, from , to, 0);
 //        listView.setAdapter(mAdapter);
 
+        mCursorAdapter.setViewBinder(new SimpleCursorAdapter.ViewBinder() {
+            @Override
+            public boolean setViewValue(View view, Cursor cursor, int columnIndex) {
+                if (columnIndex == phoneIndex) {
+                    TextView phoneView = (TextView)view;
+                    String phone = cursor.getString(columnIndex);
+                    String prefix = phone.substring(0, 1);
+                    StringBuilder sb = new StringBuilder();
+                    sb.append(prefix);
+                    for (int i = 1; i < phone.length(); i++) {
+                        sb.append("*");
+                    }
+                    phoneView.setText(sb.toString());
+                    return true;
+                }
+                return false;
+            }
+        });
+
         listView.setAdapter(mCursorAdapter);
+
+
+        listView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                Cursor c = (Cursor)listView.getItemAtPosition(position);
+                String name = c.getString(c.getColumnIndex(DBContant.AddressBook.COLUMN_NAME));
+                Toast.makeText(MainActivity.this, "name : " + name , Toast.LENGTH_SHORT).show();
+            }
+        });
 
         Button btn = (Button)findViewById(R.id.btn_search);
         btn.setOnClickListener(new View.OnClickListener() {
@@ -68,12 +100,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     String mKeyword = null;
+    int phoneIndex = -1;
     public void setData() {
 //        List<AddressData> list = DataManager.getInstance().getAddressList(mKeyword);
 //        mAdapter.clear();
 //        mAdapter.addAll(list);
         Cursor c = DataManager.getInstance().getAddressCursor(mKeyword);
         mCursorAdapter.changeCursor(c);
+        phoneIndex = c.getColumnIndex(DBContant.AddressBook.COLUMN_PHONE);
     }
 
     @Override
